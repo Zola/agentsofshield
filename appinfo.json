@@ -1,0 +1,19 @@
+{
+  "uuid": "你的UUID,去http://dev.maibu.cc/申请",
+  "name": "神盾局特工",
+  "icon": "RES_BITMAP_TEST",
+  "version": "0.0.7",
+  "watchface": "true",
+  "resources": [
+        {
+        "type": "bmp",
+        "name": "RES_BITMAP_TEST",
+        "file": "test.bmp"
+      },
+        {
+        "type": "bmp",
+        "name": "DOT_BITMAP_TEST",
+        "file": "dot.bmp"
+      }
+      ]
+      }
