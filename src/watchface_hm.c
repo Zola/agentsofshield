@@ -1,12 +1,12 @@
 /*
  * =====================================================================================
  * 
- *    Corporation:  Shenzhen Maibu Technology Co., Ltd. All Rights Reserved.
+ *    Corporation:  zuola.com
  *       Filename:  demo_watchface.c
- *         Author:  gliu , gliu@maibu.cc
- *        Created:  2015年08月19日 15时30分40秒
+ *         Author:  Zola , zuola.com@gmail.com
+ *        Created:  2015年11月10日 23时30分30秒
  * 
- *    Description:  
+ *    Description:  显示时间，
  *
  * =====================================================================================
  *
@@ -29,62 +29,40 @@
 
 
 /*窗口ID, 通过该窗口ID获取窗口句柄*/
-static int8_t g_app_mwd_window_id = -1;
+static int32_t g_app_mwd_window_id = -1;
 
 
 /*小时分钟图层ID，通过该图层ID获取图层句柄*/
-static int8_t g_app_mwd_time_layer_id = -1;
+static int32_t g_app_mwd_time_layer_id = -1;
 
 /*温度高度图层ID，通过该图层ID获取图层句柄*/
-static int8_t g_app_mwd_layer_altitude_id = -1;
-static int8_t g_app_mwd_layer_temperature_id = -1;
+static int32_t g_app_mwd_layer_altitude_id = -1;
+static int32_t g_app_mwd_layer_temperature_id = -1;
+static int32_t g_app_mwd_layer_sport_id = -1;
+static int32_t g_app_mwd_layer_pressure_id = -1;
+static int32_t g_app_mwd_battery_layer_id = -1;
+
+static uint8_t app_timer_change_id = -1;
 
 /*蓝牙图层ID，通过该图层ID获取图层句柄*/
-static int8_t g_app_mwd_layer_ble_id = -1;
+static int32_t g_app_mwd_layer_ble_id = -1;
+
+/*定时器状态static int accel_event = 0;*/
+static	int accel_event = 0;
+static	int second_timezone = 0;
+
+/*蓝牙状态*/
+
 
 /*显示小时分钟文本图层*/
 #define MWD_HM_ORIGIN_X		0
-#define MWD_HM_ORIGIN_Y		65
+#define MWD_HM_ORIGIN_Y		70
 #define MWD_HM_SIZE_H		48		
 #define MWD_HM_SIZE_W		128
 
 
-
 void app_mwd_watch_time_change(enum SysEventType type, void *context)
 {
-	/*如果系统事件是蓝牙断开 ，但由于抓不到SysEventTypeBleDisconnected的SysEventType，目前以下蓝牙状态抓不到*/
-	if (type == SysEventTypeBleDisconnected)
-	{
-		P_Window p_window = app_window_stack_get_window_by_id(g_app_mwd_window_id);	
-		if (NULL == p_window)
-		{
-			return ;
-		}
-
-		P_Layer p_ble_layer = app_window_get_layer_by_id(p_window, g_app_mwd_layer_ble_id);
-		if (NULL == p_ble_layer)
-		{
-			return;
-		}
-	 GRect frame_ble = {{0, 0}, {14, 18}};
-	GBitmap bitmap_ble2;	
-
-	/*获取位图资源, 宏RES_BITMAP_WATCHFACE_WEATHER_CLOUDY由用户在appinfo.json中配置*/
-	res_get_user_bitmap(RES_BITMAP_SETTING_BLE_2, &bitmap_ble2);
-
-	/*生成位图结构体, 依次为位图资源、显示位置、对齐方式*/
-	LayerBitmap layer_ble_bitmap = {bitmap_ble2, frame_ble, GAlignLeft};
-
-	/*创建图层*/
-	app_layer_set_bitmap_bitmap(p_ble_layer, &layer_ble_bitmap);
-
-	/*反色图层，弄为黑色*/
-	app_layer_set_bg_color(p_ble_layer, GColorBlack);
-	
-
-			app_window_update(p_window);
-	}
- 
 
 	/*如果系统事件是时间更改*/
 	if (type == SysEventTypeTimeChange)
@@ -114,6 +92,23 @@ void app_mwd_watch_time_change(enum SysEventType type, void *context)
 		{
 			return;
 		}
+			P_Layer layer_sport = app_window_get_layer_by_id(p_window, g_app_mwd_layer_sport_id);
+		if (NULL == layer_sport)
+		{
+			return;
+		}
+
+		P_Layer layer_pressure = app_window_get_layer_by_id(p_window, g_app_mwd_layer_pressure_id);
+		if (NULL == layer_pressure)
+		{
+			return;
+		}
+
+		P_Layer layer_battery = app_window_get_layer_by_id(p_window, g_app_mwd_battery_layer_id);
+		if (NULL == layer_battery)
+		{
+			return;
+		}
 		
 		struct date_time datetime;
 		app_service_get_datetime(&datetime);
@@ -123,18 +118,153 @@ void app_mwd_watch_time_change(enum SysEventType type, void *context)
 		sprintf(str, "%d:%02d", datetime.hour, datetime.min);
 		app_layer_set_text_text(p_hm_layer, str);	
 
-	/*更新海拔*/
-		sprintf(buf, "%.1fm", maibu_bsp_pressure_get_height());
-		app_layer_set_text_text(layer_altitude, buf);	
+	/*更新第二时区*/
+	int hour=datetime.hour;
+	if (hour == 7 || hour == 12 || hour == 19 )
+	{}
+	else
+	{
+	hour = (hour+24-7)%24;
+ 
+		sprintf(str, "%02d:%02d", hour, datetime.min);
+		app_layer_set_text_text(layer_battery, str);	
+	}
 
+	/*更新海拔*/
+	float altitude, accuracy;
+	int res = maibu_get_altitude(&altitude, &accuracy);
+	sprintf(buf, "%.1fm", altitude, accuracy);
+//	if (0 == res)
+//	{
+		app_layer_set_text_text(layer_altitude, buf);	
+//	}
 	/*更新温度*/
-		sprintf(buf2, "%.1f C", maibu_bsp_pressure_get_temperature());
+	float temp;
+	if (0 == maibu_get_temperature(&temp))
+	{sprintf(buf2, "%.1f C", temp);
+	
 		app_layer_set_text_text(layer_temperature, buf2);	
+	}
+	/*更新运动步数*/
+
+	SportData data;
+	if (0 == maibu_get_sport_data(&data, 0))
+	{
+		sprintf(str, "%d", data.step);	
+		app_layer_set_text_text(layer_sport, str);	
+	}
+
+	/*更新气压*/
+	float pressure;
+	if (0 == maibu_get_pressure(&pressure))
+	{
+		sprintf(str, "%0.1f", pressure);
+		app_layer_set_text_text(layer_pressure, str);	
+	}
+
 
 		app_window_update(p_window);
 	}
 }
 
+
+/*定时器，更新第二时区或剩余电量*/
+void app_timer_change(date_time_t tick_time, uint32_t millis, void* context )
+{
+	P_Window p_window = app_window_stack_get_window_by_id(g_app_mwd_window_id);	
+		if (NULL == p_window)
+		{
+			return ;
+		}
+
+	P_Layer layer_battery = app_window_get_layer_by_id(p_window, g_app_mwd_battery_layer_id);
+		if (NULL == layer_battery)
+		{
+			return;
+		}
+
+	/*更新第二时区*/
+	int8_t percent;
+	int16_t x, y, z;
+	char str[20] = "";
+
+ 	maibu_get_accel_data(&x, &y, &z);
+	int accelx=x;
+	int accely=y;
+	int accelz=z;
+	struct date_time datetime;
+	app_service_get_datetime(&datetime);
+	int hour=datetime.hour;
+	maibu_get_battery_percent(&percent);
+	
+	if (accelx < 2100 && accelx > 1960 && accely > 1950 && accely < 2080 && accelz > 2200 && accelz < 2350  && accel_event == 0)
+		{
+				
+
+	if(second_timezone == 0)
+		{
+		/* 手腕向下  */
+		hour = (hour+24-7)%24;
+		sprintf(str, "%02d:%02d", hour, datetime.min);
+		app_layer_set_text_text(layer_battery, str);		 
+ 		/*定时器状态，乒乓开关     */
+		accel_event = 1;
+		second_timezone = 1;	
+		}
+	else{
+		/* 手腕向下  */
+		sprintf(str, "电量:%d%%", percent);
+		app_layer_set_text_text(layer_battery, str);
+ 		/*定时器状态，乒乓开关     */
+		accel_event = 1;
+		second_timezone = 0;	
+		} 
+
+		}
+
+
+	if (accelx < 1900 && accely > 2000 && accely < 2080 && accelz > 1800 && accelz < 2250)
+	{
+		accel_event = 0; 
+	} 
+
+		if (accelx > 2200  && accely > 1900 && accely < 2080 && accelz > 1600 && accelz < 2250 )
+	{
+		accel_event = 0; 
+	}
+
+/*如果系统事件是蓝牙断开 
+enum BleStatus ble_status = maibu_get_ble_status();
+	if (ble_status == BLE_STATUS_CONNECTED)
+	{
+		P_Window p_window = app_window_stack_get_window_by_id(g_app_mwd_window_id);	
+		if (NULL == p_window)
+		{
+			return ;
+		}
+
+		P_Layer p_ble_layer = app_window_get_layer_by_id(p_window, g_app_mwd_layer_ble_id);
+		if (NULL == p_ble_layer)
+		{
+			return;
+		}
+	 GRect frame_ble = {{0, 0}, {14, 18}};
+	GBitmap bitmap_ble2;	
+
+	res_get_user_bitmap(BLE_BITMAP_DISCONNECTED, &bitmap_ble2);
+
+	LayerBitmap layer_ble_bitmap = {bitmap_ble2, frame_ble, GAlignLeft};
+
+	app_layer_set_bitmap_bitmap(p_ble_layer, &layer_ble_bitmap);
+	 
+	app_layer_set_bg_color(p_ble_layer, GColorBlack);
+		
+	}
+
+ */
+
+	app_window_update(p_window);
+}
 
 
 P_Window init_mwd_window()
@@ -149,8 +279,9 @@ P_Window init_mwd_window()
 
 
 
+	char str[20] = "";
 
-	/*创建位图图层显示框架范围，起始点{x=32,y=32},屏幕左上角为{0,0},高度宽度{h=64,w=64},位图大小必须小于等于框架*/
+	/*创建神盾局背景图*/
 	GRect frame = {{0, 0}, {128, 128}};
 	GBitmap bitmap;	
 
@@ -159,8 +290,6 @@ P_Window init_mwd_window()
 
 	/*生成位图结构体, 依次为位图资源、显示位置、对齐方式*/
 	LayerBitmap layer_bitmap = {bitmap, frame, GAlignCenter};
-
-
 
 	/*创建图层*/
 	P_Layer layer = app_layer_create_bitmap(&layer_bitmap);
@@ -172,20 +301,26 @@ P_Window init_mwd_window()
 	app_window_add_layer(p_window, layer);
 
  
+ 
 
 
-/*创建文本图层框架范围*/
-	GRect frame_altitude = {{80, 27}, {22, 48}};
 
-	unsigned char buf[]="8888m";
-	sprintf(buf, "%.1fm", maibu_bsp_pressure_get_height());
 
+	/*创建海拔图层1.1API*/
+	GRect frame_altitude = {{80, 0}, {15, 48}};
+
+	float altitude, accuracy;
+	int res = maibu_get_altitude(&altitude, &accuracy);
+
+
+
+	sprintf(str, "%0.1fm", altitude, accuracy);
 
 	/*生成文本结构体, 依次为文本内容、文本显示框架、对齐方式、字体字号*/
-	LayerText text = {buf, frame_altitude, GAlignLeft, U_GBK_SIMSUN_12};
+	LayerText text_altitude = {str, frame_altitude, GAlignCenter, U_ASCII_ARIALBD_12, 0};
 
 	/*创建文本图层*/
-	P_Layer layer_altitude = app_layer_create_text(&text);
+	P_Layer layer_altitude = app_layer_create_text(&text_altitude);
 	/*反色图层，弄为黑色*/
 	app_layer_set_bg_color(layer_altitude, GColorBlack);
 	/*添加文本图层到窗口中*/
@@ -197,20 +332,37 @@ P_Window init_mwd_window()
 
 	
 
- 
+
+	/*添加气压数据图层*/
+	GRect frame_pressure = {{80, 15}, {14, 48}};
+	float pressure;
+	if (0 == maibu_get_pressure(&pressure))
+	{
+		sprintf(str, "%0.1f ", pressure);
+		LayerText lt_pressure = {str, frame_pressure, GAlignCenter, U_ASCII_ARIAL_12, 0};
+		P_Layer layer_pressure = app_layer_create_text(&lt_pressure);
+		app_layer_set_bg_color(layer_pressure, GColorBlack);
+		if(layer_pressure != NULL)
+	{
+		g_app_mwd_layer_pressure_id = app_window_add_layer(p_window, layer_pressure);
+	}
+	}
 
 
-/*创建文本图层框架范围*/
-	GRect frame_temperature = {{80, 10}, {22, 48}};
 
-	unsigned char buf2[]="25.5'C";
-	sprintf(buf2, "%.1f C", maibu_bsp_pressure_get_temperature());
 
+	/*创建温度图层1.1API*/
+	GRect frame_temperature = {{80, 30}, {15, 48}};
+
+	float temp;
+	if (0 == maibu_get_temperature(&temp))
+	{
+	sprintf(str, "%0.1f C", temp);
 	/*生成文本结构体, 依次为文本内容、文本显示框架、对齐方式、字体字号*/
-	LayerText text2 = {buf2, frame_temperature, GAlignLeft, U_GBK_SIMSUN_12};
+	LayerText text_temp = {str, frame_temperature, GAlignCenter, U_ASCII_ARIALBD_12, 0};
 
 	/*创建文本图层*/
-	P_Layer layer_temperature = app_layer_create_text(&text2);
+	P_Layer layer_temperature = app_layer_create_text(&text_temp);
 	/*反色图层，弄为黑色*/
 	app_layer_set_bg_color(layer_temperature, GColorBlack);
 	/*添加文本图层到窗口中*/
@@ -218,11 +370,25 @@ P_Window init_mwd_window()
 	{
 		g_app_mwd_layer_temperature_id = app_window_add_layer(p_window, layer_temperature);
 	}
+	}	
 
-
-	
 
  
+	/*添加运动数据图层*/
+	GRect frame_step = {{80, 45}, {15, 48}};
+	SportData data;
+	if (0 == maibu_get_sport_data(&data, 0))
+	{
+		sprintf(str, "%d", data.step);
+		LayerText lt_step = {str, frame_step, GAlignCenter, U_GBK_SIMSUNBD_12, 0};
+		P_Layer layer_sport = app_layer_create_text(&lt_step);
+		app_layer_set_bg_color(layer_sport, GColorBlack);
+	if(layer_sport != NULL)
+	{
+		g_app_mwd_layer_sport_id = app_window_add_layer(p_window, layer_sport);
+	}
+	}
+
 
 	/*添加小时分钟图层*/
 	GRect frame_hm = {{MWD_HM_ORIGIN_X, MWD_HM_ORIGIN_Y}, {MWD_HM_SIZE_H, MWD_HM_SIZE_W}};
@@ -240,8 +406,49 @@ P_Window init_mwd_window()
 	}
 
 
+	/*添加电量数据图层，仅在7点，12点和晚上19点这三个小时显示电量百分比*/
+	GRect frame_battery ={{0, 62}, {14, 60}};
+	int8_t percent;
+	maibu_get_battery_percent(&percent);
+	int hour=d.hour;
+	if (hour == 7 || hour == 12 || hour == 19 )
+	{
+		sprintf(str, "电量:%d%%", percent);
+		LayerText lt_battery = {str, frame_battery, GAlignCenter, U_GBK_SIMSUN_12, 0};
+		P_Layer layer_battery = app_layer_create_text(&lt_battery);
+		app_layer_set_bg_color(layer_battery, GColorBlack);
+		if(layer_battery != NULL)
+		{
+			g_app_mwd_battery_layer_id = app_window_add_layer(p_window, layer_battery);
+		}
+	}
+	/*显示第二时区,减7小时*/
+else{
+	
+	hour = (hour+24-7)%24;
+	char time_str[20] = "";
+	sprintf(time_str, "%02d:%02d", hour, d.min);
+	LayerText lt_battery = {time_str, frame_battery, GAlignCenter, U_GBK_SIMSUN_12, 0};
+	P_Layer layer_battery = app_layer_create_text(&lt_battery);
+	/*反色图层，弄为黑色*/
+	app_layer_set_bg_color(layer_battery, GColorBlack);
+
+	if(layer_battery != NULL)
+	{
+		g_app_mwd_battery_layer_id = app_window_add_layer(p_window, layer_battery);
+	}
+
+	}
+
+	/*创建状态栏*/
+//	app_plug_status_bar_create(p_window, NULL, NULL, NULL);
+//	app_plug_status_bar_add_time(p_window);		/*状态栏中添加时间*/
+//	app_plug_status_bar_add_ble(p_window);		/*状态栏中添加蓝牙状态*/
+//	app_plug_status_bar_add_battery(p_window);	/*状态栏中添加电量状态*/
+
+
 	/*添加日期图层*/
-	GRect frame_date = {{0, 110}, {24, 128}};
+	GRect frame_date = {{0, 110}, {20, 128}};
 	struct date_time t;
 	app_service_get_datetime(&t);
 	char date_str[20] = "";
@@ -253,8 +460,12 @@ P_Window init_mwd_window()
 	app_window_add_layer(p_window, layer_text_date);
  
 
+
+
+
+
 	/*添加星期状态图层*/
-	GRect frame_week = {{0, 53}, {14, 110}};
+	GRect frame_week = {{0, 62}, {14, 110}};
 	struct date_time w;
 	app_service_get_datetime(&w);
 	char week_str[20] = "";
@@ -281,7 +492,7 @@ P_Window init_mwd_window()
 	sprintf(week_str, "星期六");
 			}
 
-	LayerText lt_week = {week_str, frame_week, GAlignRight, U_GBK_SIMSUN_14, 0};
+	LayerText lt_week = {week_str, frame_week, GAlignRight, U_GBK_SIMSUN_12, 0};
 	P_Layer p_week_layer = app_layer_create_text(&lt_week);
 	/*反色图层，弄为黑色*/
 	app_layer_set_bg_color(p_week_layer, GColorBlack);
@@ -289,31 +500,30 @@ P_Window init_mwd_window()
 	app_window_add_layer(p_window, p_week_layer);
 	
 
-	/*添加蓝牙状态图层*/
+/*添加蓝牙状态图层
 	GRect frame_ble = {{0, 0}, {14, 18}};
 	GBitmap bitmap_ble;	
 
-	/*获取位图资源, 宏RES_BITMAP_WATCHFACE_WEATHER_CLOUDY由用户在appinfo.json中配置*/
-	res_get_user_bitmap(RES_BITMAP_SETTING_BLE_1, &bitmap_ble);
+ 
+	res_get_user_bitmap(DOT_BITMAP_TEST, &bitmap_ble);
 
-	/*生成位图结构体, 依次为位图资源、显示位置、对齐方式*/
+ 
 	LayerBitmap layer_ble_bitmap = {bitmap_ble, frame_ble, GAlignLeft};
 
-	/*创建图层*/
-	P_Layer p_ble_layer = app_layer_create_bitmap(&layer_ble_bitmap);
+ 	P_Layer p_ble_layer = app_layer_create_bitmap(&layer_ble_bitmap);
 
-	/*反色图层，弄为黑色*/
-	//app_layer_set_bg_color(p_ble_layer, GColorBlack);
+ 
+	app_layer_set_bg_color(p_ble_layer, GColorBlack);
 	
-	/*添加图层到窗口中*/
+ 
 	if(p_ble_layer != NULL)
 	{
 		g_app_mwd_layer_ble_id = app_window_add_layer(p_window, p_ble_layer);
 	}
- 
+ */
 
- 	/*创建位图图层DOT,作用是代替显示ºC，起始点{x=105,y=16},屏幕左上角为{横,竖},高度宽度{h=1,w=1},位图大小必须小于等于框架*/
-	GRect frame_dot = {{105, 16}, {1, 1}};
+ 	/*创建位图图层DOT,作用是代替显示ºC，*/
+	GRect frame_dot = {{110, 32}, {2, 2}};
 	GBitmap bitmap_dot;	
 
 	/*获取位图资源, 宏RES_BITMAP_WATCHFACE_WEATHER_CLOUDY由用户在appinfo.json中配置*/
@@ -322,19 +532,14 @@ P_Window init_mwd_window()
 	/*生成位图结构体, 依次为位图资源、显示位置、对齐方式*/
 	LayerBitmap layer_bitmap_dot = {bitmap_dot, frame_dot, GAlignRight};
 
-
-
 	/*创建图层*/
 	P_Layer layer_dot = app_layer_create_bitmap(&layer_bitmap_dot);
 
 	/*反色图层，弄为黑色*/
-	app_layer_set_bg_color(layer_dot, GColorBlack);
+	//app_layer_set_bg_color(layer_dot, GColorBlack);
 
 	/*添加图层到窗口中*/
 	app_window_add_layer(p_window, layer_dot);
-
- 
-	
 
 
 	/*注册一个事件通知回调，当有时间改变时，立即更新时间*/
@@ -342,12 +547,9 @@ P_Window init_mwd_window()
 
 
 
-
-
 	return p_window;
 
 }
-
 
 
 int main()
@@ -357,10 +559,14 @@ int main()
 	P_Window p_window = init_mwd_window();
 	if (p_window != NULL)
 	{
+
+
+
 		/*放入窗口栈显示*/
 		g_app_mwd_window_id = app_window_stack_push(p_window);
 	}	
-
+/*每300毫米刷新*/
+	app_timer_change_id = app_service_timer_subscribe(100, app_timer_change, NULL);
 
 }
 

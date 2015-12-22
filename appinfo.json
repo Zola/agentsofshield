@@ -1,8 +1,8 @@
 {
-  "uuid": "你的UUID,去http://dev.maibu.cc/申请",
+  "uuid": "64c71e79fab22f7eabce03b270e8fdc8",
   "name": "神盾局特工",
   "icon": "RES_BITMAP_TEST",
-  "version": "0.0.7",
+  "version": "0.1.4",
   "watchface": "true",
   "resources": [
         {
@@ -14,6 +14,11 @@
         "type": "bmp",
         "name": "DOT_BITMAP_TEST",
         "file": "dot.bmp"
+      },
+	{
+        "type": "bmp",
+        "name": "BLE_BITMAP_DISCONNECTED",
+        "file": "ble.bmp"
       }
       ]
       }
