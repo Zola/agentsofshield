@@ -2,7 +2,7 @@
   "uuid": "64c71e79fab22f7eabce03b270e8fdc8",
   "name": "神盾局特工",
   "icon": "RES_BITMAP_TEST",
-  "version": "0.1.4",
+  "version": "0.2.3",
   "watchface": "true",
   "resources": [
         {
@@ -12,13 +12,18 @@
       },
         {
         "type": "bmp",
-        "name": "DOT_BITMAP_TEST",
+        "name": "DOT_BITMAP",
         "file": "dot.bmp"
+      },
+        {
+        "type": "bmp",
+        "name": "BLE_CONNECTED",
+        "file": "ble_con.bmp"
       },
 	{
         "type": "bmp",
-        "name": "BLE_BITMAP_DISCONNECTED",
-        "file": "ble.bmp"
+        "name": "BLE_DISCONNECTED",
+        "file": "ble_dis.bmp"
       }
       ]
       }

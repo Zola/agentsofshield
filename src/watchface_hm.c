@@ -49,19 +49,36 @@ static int32_t g_app_mwd_layer_ble_id = -1;
 
 /*定时器状态static int accel_event = 0;*/
 static	int accel_event = 0;
+static	int ble_staus_event = 0;
 static	int second_timezone = 0;
 
 /*蓝牙状态*/
 
 
+enum BleStatus{
+BLE_STATUS_ADVERTISING, // 广播
+BLE_STATUS_CONNECTED, // 被连接
+BLE_STATUS_USING, // 使用中（发送数据中）
+BLE_STATUS_CLOSE // 该状态蓝牙被关闭 
+};
+
+enum AppCommStatus{
+APP_COMM_STATUS_ADVERTISING,  //广播
+APP_COMM_STATUS_CONNECTED,   //被连接
+APP_COMM_STATUS_AVAILABLE,  //可用
+APP_COMM_STATUS_BUSY,
+APP_COMM_STATUS_DISCONNECTED  //断开连接
+};
+
+
 /*显示小时分钟文本图层*/
 #define MWD_HM_ORIGIN_X		0
-#define MWD_HM_ORIGIN_Y		70
+#define MWD_HM_ORIGIN_Y		68
 #define MWD_HM_SIZE_H		48		
 #define MWD_HM_SIZE_W		128
 
 
-void app_mwd_watch_time_change(enum SysEventType type, void *context)
+void app_zola_watch_time_change(enum SysEventType type, void *context)
 {
 
 	/*如果系统事件是时间更改*/
@@ -233,36 +250,56 @@ void app_timer_change(date_time_t tick_time, uint32_t millis, void* context )
 		accel_event = 0; 
 	}
 
-/*如果系统事件是蓝牙断开 
-enum BleStatus ble_status = maibu_get_ble_status();
-	if (ble_status == BLE_STATUS_CONNECTED)
+//如果系统事件是蓝牙断开
+enum AppCommStatus  ble_sta;
+
+ble_sta = maibu_get_ble_status();  //获取蓝牙状态
+
+ if (ble_sta != BLE_STATUS_CONNECTED && ble_sta != BLE_STATUS_USING)   //如果蓝牙断开
 	{
-		P_Window p_window = app_window_stack_get_window_by_id(g_app_mwd_window_id);	
-		if (NULL == p_window)
+	if( ble_staus_event == 0 )
 		{
-			return ;
-		}
+		P_Window p_window = app_window_stack_get_window_by_id(g_app_mwd_window_id);	
+			if (NULL == p_window)
+			{
+				return ;
+			}
 
 		P_Layer p_ble_layer = app_window_get_layer_by_id(p_window, g_app_mwd_layer_ble_id);
-		if (NULL == p_ble_layer)
-		{
-			return;
-		}
-	 GRect frame_ble = {{0, 0}, {14, 18}};
+			if (NULL == p_ble_layer)
+			{
+				return;
+			}
 	GBitmap bitmap_ble2;	
-
-	res_get_user_bitmap(BLE_BITMAP_DISCONNECTED, &bitmap_ble2);
-
-	LayerBitmap layer_ble_bitmap = {bitmap_ble2, frame_ble, GAlignLeft};
-
-	app_layer_set_bitmap_bitmap(p_ble_layer, &layer_ble_bitmap);
-	 
-	app_layer_set_bg_color(p_ble_layer, GColorBlack);
-		
+	ble_staus_event = 1;
+	res_get_user_bitmap(BLE_DISCONNECTED, &bitmap_ble2);
+	app_layer_set_bitmap_bitmap(p_ble_layer, &bitmap_ble2);
+	app_window_update(p_window);
+	maibu_service_vibes_pulse(VibesPulseTypeShort,1); //调用短振动1次， 
+		}
 	}
-
- */
-
+   else if (ble_sta = BLE_STATUS_CONNECTED) //如果系统事件是蓝牙連接
+		{ 
+	if( ble_staus_event == 1 )
+		{
+		P_Window p_window = app_window_stack_get_window_by_id(g_app_mwd_window_id);	
+			if (NULL == p_window)
+			{
+				return ;
+			}
+		P_Layer p_ble_layer = app_window_get_layer_by_id(p_window, g_app_mwd_layer_ble_id);
+			if (NULL == p_ble_layer)
+			{
+				return;
+			}
+	GBitmap bitmap_ble2;	
+	ble_staus_event = 0;
+	res_get_user_bitmap(BLE_CONNECTED, &bitmap_ble2);
+	app_layer_set_bitmap_bitmap(p_ble_layer, &bitmap_ble2);
+	app_window_update(p_window);
+	maibu_service_vibes_pulse(VibesPulseTypeShort,1); //调用短振动1次， 
+		} 
+	}	
 	app_window_update(p_window);
 }
 
@@ -461,7 +498,43 @@ else{
  
 
 
+//添加蓝牙状态图层
 
+enum AppCommStatus  ble_sta;
+
+ble_sta = maibu_get_ble_status();  //获取蓝牙状态
+
+ if (ble_sta != BLE_STATUS_CONNECTED && ble_sta != BLE_STATUS_USING)   //如果蓝牙断开
+	{
+	ble_staus_event = 1;
+	}
+
+	GRect frame_ble = {{0, 0}, {60, 60}};
+	GBitmap bitmap_ble;	
+
+ 	if( ble_staus_event == 0 ){
+	res_get_user_bitmap(BLE_CONNECTED, &bitmap_ble);
+}
+else 
+{
+	res_get_user_bitmap(BLE_DISCONNECTED, &bitmap_ble);
+}
+ 
+	LayerBitmap layer_ble_bitmap = {bitmap_ble, frame_ble, GAlignLeft};
+
+ 	P_Layer p_ble_layer = app_layer_create_bitmap(&layer_ble_bitmap);
+
+ 
+	app_layer_set_bg_color(p_ble_layer, GColorBlack);
+	
+ 
+	if(p_ble_layer != NULL)
+	{
+		g_app_mwd_layer_ble_id = app_window_add_layer(p_window, p_ble_layer);
+	}
+
+
+//添加蓝牙状态图层結束
 
 
 	/*添加星期状态图层*/
@@ -500,34 +573,14 @@ else{
 	app_window_add_layer(p_window, p_week_layer);
 	
 
-/*添加蓝牙状态图层
-	GRect frame_ble = {{0, 0}, {14, 18}};
-	GBitmap bitmap_ble;	
 
- 
-	res_get_user_bitmap(DOT_BITMAP_TEST, &bitmap_ble);
-
- 
-	LayerBitmap layer_ble_bitmap = {bitmap_ble, frame_ble, GAlignLeft};
-
- 	P_Layer p_ble_layer = app_layer_create_bitmap(&layer_ble_bitmap);
-
- 
-	app_layer_set_bg_color(p_ble_layer, GColorBlack);
-	
- 
-	if(p_ble_layer != NULL)
-	{
-		g_app_mwd_layer_ble_id = app_window_add_layer(p_window, p_ble_layer);
-	}
- */
 
  	/*创建位图图层DOT,作用是代替显示ºC，*/
 	GRect frame_dot = {{110, 32}, {2, 2}};
 	GBitmap bitmap_dot;	
 
 	/*获取位图资源, 宏RES_BITMAP_WATCHFACE_WEATHER_CLOUDY由用户在appinfo.json中配置*/
-	res_get_user_bitmap(DOT_BITMAP_TEST, &bitmap_dot);
+	res_get_user_bitmap(DOT_BITMAP, &bitmap_dot);
 
 	/*生成位图结构体, 依次为位图资源、显示位置、对齐方式*/
 	LayerBitmap layer_bitmap_dot = {bitmap_dot, frame_dot, GAlignRight};
@@ -543,7 +596,7 @@ else{
 
 
 	/*注册一个事件通知回调，当有时间改变时，立即更新时间*/
-	maibu_service_sys_event_subscribe(app_mwd_watch_time_change);
+	maibu_service_sys_event_subscribe(app_zola_watch_time_change);
 
 
 
@@ -565,8 +618,8 @@ int main()
 		/*放入窗口栈显示*/
 		g_app_mwd_window_id = app_window_stack_push(p_window);
 	}	
-/*每300毫米刷新*/
-	app_timer_change_id = app_service_timer_subscribe(100, app_timer_change, NULL);
+/*每200毫米刷新*/
+	app_timer_change_id = app_service_timer_subscribe(200, app_timer_change, NULL);
 
 }
 
